@@ -25,9 +25,11 @@ type Comment struct {
 	Body string
 }
 
+var tutorials []Tutorial
+
 // Function to return an array of tutorials
 func populate() []Tutorial {
-	author := &Author{Name: "Kevin Terah", Tutorials: []int{1}}
+	author := &Author{Name: "Kevin Terah", Tutorials: []int{1, 2}}
 	tutorial := Tutorial{
 		ID:     1,
 		Title:  "Environmental Hygiene",
@@ -37,8 +39,19 @@ func populate() []Tutorial {
 		},
 	}
 
-	var tutorials []Tutorial
+	tutorial2 := Tutorial{
+		ID:     2,
+		Title:  "Environmental Cost",
+		Author: *author,
+		Comments: []Comment{
+			Comment{Body: "Weather is good ..."},
+		},
+	}
+
+	//	var tutorials []Tutorial
+
 	tutorials = append(tutorials, tutorial)
+	tutorials = append(tutorials, tutorial2)
 
 	return tutorials
 }
@@ -79,13 +92,34 @@ var tutorialType = graphql.NewObject(
 	},
 )
 
+var mutationType = graphql.NewObject(graphql.ObjectConfig{
+	Name: "Mutation",
+	Fields: graphql.Fields{
+		"create": &graphql.Field{
+			Type:        tutorialType,
+			Description: "Create a new tutorial",
+			Args: graphql.FieldConfigArgument{
+				"title": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+			},
+			Resolve: func(params graphql.ResolveParams) (interface{}, error) {
+				tutorial := Tutorial{Title: params.Args["title"].(string)}
+				tutorials = append(tutorials, tutorial)
+
+				return tutorial, nil
+			},
+		},
+	},
+})
+
 func main() {
-	tutorials := populate()
+	tutorials = populate()
 
 	// Schema
 	fields := graphql.Fields{
 		"tutorial": &graphql.Field{
-			Type:        graphql.String,
+			Type:        tutorialType,
 			Description: "Get a tutorial by ID",
 			Args: graphql.FieldConfigArgument{
 				"id": &graphql.ArgumentConfig{Type: graphql.Int},
@@ -117,7 +151,10 @@ func main() {
 	}
 
 	rootQuery := graphql.ObjectConfig{Name: "RootQuery", Fields: fields}
-	schemaConfig := graphql.SchemaConfig{Query: graphql.NewObject(rootQuery)}
+	schemaConfig := graphql.SchemaConfig{
+		Query:    graphql.NewObject(rootQuery),
+		Mutation: mutationType,
+	}
 	schema, err := graphql.NewSchema(schemaConfig)
 	if err != nil {
 		log.Fatalf("Failed to create new schema, error: %v", err)
@@ -125,17 +162,9 @@ func main() {
 
 	// Query
 	query := `
-		{
-			list {
-				id
+		mutation {
+			 create(title: "Kele Ne Oo") {
 				title
-				comments {
-					body
-				}
-				author {
-					Name
-					Tutorials
-				}
 			}
 		}
 	`
@@ -145,5 +174,5 @@ func main() {
 		log.Fatalf("Failed to execute graphql operation, errors: %+v", r.Errors)
 	}
 	rJSON, _ := json.Marshal(r)
-	fmt.Printf("%s \n", rJSON) // {"data": {"hello" : "world"}}
+	fmt.Printf("%s \n", rJSON)
 }
